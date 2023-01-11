@@ -13,8 +13,7 @@
 
 //*******************************************************************************************
 //*******************************************************************************************
-
-static volatile Task_t   taskArray[MAX_TASKS];// очередь задач
+static volatile task_t   taskArray[MAX_TASKS];// очередь задач
 static volatile uint32_t arrayTail = 0;		  // "хвост" очереди
 static volatile uint32_t tickCount = 0;		  //
 
@@ -51,7 +50,7 @@ void RTOS_Init(void){
  */
 void RTOS_SetTask(void(*taskFunc)(void), uint32_t taskDelay, uint32_t taskPeriod){
    
-	volatile Task_t *task = &taskArray[0];
+	volatile task_t *task = &taskArray[0];
 	//-----------------------------
 	if(!taskFunc) return;
 	//Поиск задачи в текущем списке
@@ -109,13 +108,13 @@ void RTOS_DeleteTask(void(*taskFunc)(void)){
 void RTOS_DispatchLoop(void){
 
 	void(*function)(void);
-	volatile Task_t *task = &taskArray[0];
+	volatile task_t *task = &taskArray[0];
 	//-----------------------------
 	//проходим по списку задач
 	for(uint32_t i=0; i< arrayTail; i++)
 	{
 		//если флаг на выполнение взведен,
-		if(task->state == TASK_RUN) //task->Run == 1)
+		if(task->state == TASK_RUN)
 		{
 			_disableInterrupt();   //Глобальное запрещение прерываний.
 			function = task->pFunc;// запоминаем задачу, т.к. во время выполнения может измениться индекс
@@ -153,7 +152,7 @@ void RTOS_DispatchLoop(void){
 
 void RTOS_TimerServiceLoop(void){
 
-	volatile Task_t *task = &taskArray[0];
+	volatile task_t *task = &taskArray[0];
 	//-----------------------------
 	tickCount++;
 	for(uint32_t i=0; i < arrayTail; i++)//проходим по списку задач
@@ -162,7 +161,7 @@ void RTOS_TimerServiceLoop(void){
 	    else task->delay--;                           //иначе уменьшаем время
 	    task++;
 
-	    //Такая реалилизация занимает больше места.
+	    //Такая реализация занимает больше места.
 //		if(TaskArray[i].delay == 0) TaskArray[i].state = TASK_RUN;
 //		else TaskArray[i].delay--;
 	}
