@@ -6,7 +6,7 @@
 //*******************************************************************************************
 //*******************************************************************************************
 //Настройка АЦП. 
-void ADC_Init(void){
+void STM32_ADC_Init(void){
 
 	RCC->APB2ENR |= (RCC_APB2ENR_ADC1EN | //Разрешить тактирование АЦП1.
 				     RCC_APB2ENR_IOPBEN );//Разрешить тактирование порта PORTB
@@ -38,28 +38,28 @@ void ADC_Init(void){
 	while (ADC1->CR2 & ADC_CR2_CAL){};   //ждем окончания калибровки
 }
 //**********************************************************
-void ADC_Loop(void){
+void STM32_ADC_Loop(void){
 
 
 }
 //**********************************************************
-//Одно измерение АЦП.
-uint32_t ADC_GetMeas(uint32_t adcChannel){
+//Одно измерение АЦП в мВ.
+uint16_t STM32_ADC_GetMeas_mV(uint32_t adcCh){
   
-	ADC1->SQR3 = adcChannel;      	  //загрузить номер канала.
+	ADC1->SQR3 = adcCh;      	 	  //задать номер канала.
 	ADC1->CR2 |= ADC_CR2_SWSTART;     //запуск преобразования в регулярном канале.
 	while(!(ADC1->SR & ADC_SR_EOC)){};//дождаться окончания преобразования
 	//Вычитать значение самокалибровки ненужно, АЦП это делает сам.
-	return (uint32_t)((ADC1->DR * ADC_QUANT + ADC_SCALE/2) / ADC_SCALE);
+	return (uint16_t)((ADC1->DR * STM32_ADC_QUANT_uV + STM32_ADC_SCALE/2) / STM32_ADC_SCALE);
 	//return ADC1->DR;
 }
 //**********************************************************
-uint16_t ADC_GetRegDR(ADC_TypeDef *adc){
+uint32_t STM32_ADC_GetRegDR(ADC_TypeDef *adc){
 
     return adc->DR;
 }
 //**********************************************************
-uint16_t ADC_GetRegJDRx(ADC_TypeDef *adc, uint8_t ch){
+uint32_t STM32_ADC_GetRegJDRx(ADC_TypeDef *adc, uint32_t ch){
 
 	if(ch == 1)return adc->JDR1;
 	if(ch == 2)return adc->JDR2;
