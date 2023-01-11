@@ -99,9 +99,9 @@
 //#define DRV_RESET_Toggel() 	(GPIOA->ODR ^= GPIO_ODR_ODR7)
 //************************************
 // Макросы
-#define GPIO_PIN_High(gpio, pin) 	(gpio->BSRR = (0x001<<pin))
-#define GPIO_PIN_Low(gpio, pin)  	(gpio->BSRR = (0x100<<pin))
-#define GPIO_PIN_Toggel(gpio, pin)	(gpio->ODR ^= (0x001<<pin))
+#define GPIO_PIN_High(gpio, pin) 	(gpio->BSRR = (0x00001<<pin))
+#define GPIO_PIN_Low(gpio, pin)  	(gpio->BSRR = (0x10000<<pin))
+#define GPIO_PIN_Toggel(gpio, pin)	(gpio->ODR ^= (0x00001<<pin))
 
 //************************************
 //#define LedPC13On()     (GPIOC->BSRR = GPIO_BSRR_BS13)
