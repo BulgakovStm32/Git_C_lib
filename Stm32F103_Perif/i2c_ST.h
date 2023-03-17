@@ -34,9 +34,12 @@
 #define I2C_FM_CCR			30 //(2500U / (3 * TPCLK1))
 #define I2C_FM_TRISE		12 //(300U  / TPCLK1)
 //--------------------------
-//Таймаут ожидания сброса флага.
+//Таймаут ожидания сброса флага регистра SR1.
 //Меньше 70 не делать, т.е. пауза будет меньше чем время передачи байта адреса
-#define I2C_WAIT_TIMEOUT	100//1000//5000//50000U
+#define I2C_WAIT_TIMEOUT_SR1	100//1000//5000//50000U
+
+//Таймаут ожидания сброса флага регистра CR1.
+#define I2C_WAIT_TIMEOUT_CR1	2000
 //--------------------------
 #define I2C_MODE_MASTER		0	//режим Master.
 #define I2C_MODE_SLAVE		1	//режим Slave
@@ -56,7 +59,7 @@ typedef enum{
 	//I2C_BUSY,		//Шина I2C занята (передача/прием данных)
 	//I2C_ERR_TX_BYTE,//Вышел таймаут передачи байта.
 	//I2C_ERR_RX_BYTE,//Вышел таймаут приема байта.
-	//I2C_ERR_BTF		//Вышел таймаут Byte transfer finished
+	//I2C_ERR_BTF	  //Вышел таймаут Byte transfer finished
 }I2C_State_t;
 //*******************************************************************************************
 //*******************************************************************************************
@@ -120,7 +123,7 @@ typedef enum{
 //#pragma pack(push, 1)//размер выравнивания в 1 байт
 typedef struct{
 	//Конфигурация I2C
-	I2C_TypeDef 	*i2c;			//
+	I2C_TypeDef 	*i2c;			//Порт I2C
 	uint32_t 	 	i2cMode	 : 1;	//Master или Slave
 	uint32_t 		gpioRemap: 1;	//Ремап выводов для I2C1, для I2C2 ремапа нет.
 	uint32_t 	 	i2cSpeed : 30;	//Скорость работы I2C
@@ -140,12 +143,13 @@ typedef struct{
 //#pragma pack(pop)//вернули предыдущую настройку.
 //*******************************************************************************************
 //*******************************************************************************************
-void 	 I2C_IT_Init(I2C_IT_t *i2c);
-void 	 I2C_IT_DeInit(I2C_IT_t *i2cIt);
-void 	 I2C_IT_SetTxSize(I2C_IT_t *i2cIt, uint32_t size);
-void 	 I2C_IT_SetpBuf(I2C_IT_t *i2cIt, uint8_t *pBuf);
-void 	 I2C_IT_SetDataSize(I2C_IT_t *i2cIt, uint32_t size);
-uint32_t I2C_IT_GetDataCount(I2C_IT_t *i2cIt);
+void 	 		I2C_IT_Init(I2C_IT_t *i2c);
+void 	 		I2C_IT_DeInit(I2C_IT_t *i2cIt);
+void 	 		I2C_IT_SetTxSize(I2C_IT_t *i2cIt, uint32_t size);
+void 	 		I2C_IT_SetpBuf(I2C_IT_t *i2cIt, uint8_t *pBuf);
+void 	 		I2C_IT_SetDataSize(I2C_IT_t *i2cIt, uint32_t size);
+uint32_t 		I2C_IT_GetDataCount(I2C_IT_t *i2cIt);
+I2C_IT_State_t 	I2C_IT_GetState(I2C_IT_t *i2cIt);
 
 //Функции обратного вызова
 void I2C_IT_SlaveTxCpltCallback(I2C_IT_t *i2cIt);

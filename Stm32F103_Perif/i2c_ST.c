@@ -16,7 +16,7 @@
 static uint32_t i2c1NacCount = 0;
 static uint32_t i2c2NacCount = 0;
 
-//Указатели на контекст шины I2C. Они нужны для работы обработчиков прерываний.
+//Указатели на контекст шины I2C. Нужны для работы обработчиков прерываний.
 static I2C_IT_t	*i2c1_IT_Define;
 static I2C_IT_t	*i2c2_IT_Define;
 //*******************************************************************************************
@@ -24,18 +24,18 @@ static I2C_IT_t	*i2c2_IT_Define;
 //*******************************************************************************************
 //******************************СТАТИЧЕСКИЕ ФУНКЦИИ******************************************
 //Ожидание сброса флага в регистре SR1.
-static uint32_t _i2c_LongWait(I2C_TypeDef *i2c, uint32_t flag){
+static uint32_t _i2c_WaitClearFlagSR1(I2C_TypeDef *i2c, uint32_t flag){
 
 	volatile uint32_t count = 0;
 	//---------------------
 	while(!(i2c->SR1 & flag))//Ждем отпускания флага.
 	{
-		if(++count >= I2C_WAIT_TIMEOUT) return 1;
+		if(++count >= I2C_WAIT_TIMEOUT_SR1) return 1;
 	}
 	return 0;
 }
 //**********************************************************
-//while(i2c->CR1 & I2C_CR1_STOP);		//Wait until STOP is cleared by hardware
+//while(i2c->CR1 & I2C_CR1_STOP);	//Wait until STOP is cleared by hardware
 //Ожидание сброса флага в регистре CR1.
 static uint32_t _i2c_ClearFlagCR1(I2C_TypeDef *i2c, uint32_t flag){
 
@@ -43,7 +43,7 @@ static uint32_t _i2c_ClearFlagCR1(I2C_TypeDef *i2c, uint32_t flag){
 	//---------------------
 	while(i2c->CR1 & flag)//Ждем отпускания флага.
 	{
-		if(++count >= I2C_WAIT_TIMEOUT) return 1;
+		if(++count >= I2C_WAIT_TIMEOUT_CR1) return 1;
 	}
 	return 0;
 }
@@ -52,7 +52,7 @@ static uint32_t _i2c_ClearFlagCR1(I2C_TypeDef *i2c, uint32_t flag){
 static void _i2c_GpioInit(I2C_TypeDef *i2c, uint32_t remap){
 
 	RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;//Включаем тактирование GPIOB
-	//Тактирование I2C_1
+	//I2C_1
 	if(i2c == I2C1)
 	{
 		//Ремап:
@@ -72,7 +72,7 @@ static void _i2c_GpioInit(I2C_TypeDef *i2c, uint32_t remap){
 						  GPIO_CRL_CNF6    | GPIO_CRL_CNF7;
 		}
 	}
-	//Тактирование I2C_2
+	//I2C_2
 	else if(i2c == I2C2)
 	{
 		//I2C2_SCL - PB10,
@@ -99,14 +99,14 @@ static void _i2c_ModeInit(I2C_TypeDef *i2c, uint32_t mode){
 	i2c->CR1 |=  I2C_CR1_PE;    //Включение модуля I2C1.
 	i2c->CR1 &= ~I2C_CR1_SMBUS; //модуль работает в режиме I2C
 
-//	Bit 7 NOSTRETCH: Clock stretching disable (Slave mode)
-//	This bit is used to disable clock stretching in slave mode when ADDR or BTF flag is set, until
-//	it is reset by software.
-//	0: Clock stretching enabled
-//	1: Clock stretching disabled
-//	i2c->CR1 |= I2C_CR1_NOSTRETCH;
+	//Bit 7 NOSTRETCH: Clock stretching disable (Slave mode)
+	//This bit is used to disable clock stretching in slave mode when ADDR or BTF flag is set, until
+	//it is reset by software.
+	//0: Clock stretching enabled
+	//1: Clock stretching disabled
+	//i2c->CR1 |= I2C_CR1_NOSTRETCH;
 
-	i2c->SR1  = 0; 			    //Сброс флагов ошибок.
+	i2c->SR1 = 0; 			    //Сброс флагов ошибок.
 
 	if(mode == I2C_MODE_MASTER) i2c->SR2 |=  I2C_SR2_MSL;//режим Master.
 	else			 	   		i2c->SR2 &= ~I2C_SR2_MSL;//режим Slave
@@ -149,7 +149,7 @@ I2C_State_t I2C_StartAndSendDeviceAddr(I2C_TypeDef *i2c, uint8_t deviceAddr){
 
 	//Формирование Start condition.
 	i2c->CR1 |= I2C_CR1_START;
-	if(_i2c_LongWait(i2c, I2C_SR1_SB))	//Ожидание формирования Start condition.
+	if(_i2c_WaitClearFlagSR1(i2c, I2C_SR1_SB))	//Ожидание формирования Start condition.
 	{
 		i2c->CR1 |= I2C_CR1_STOP;		//Формируем Stop
 		return I2C_ERR_START; 			//Start condition не сформирована.
@@ -159,9 +159,9 @@ I2C_State_t I2C_StartAndSendDeviceAddr(I2C_TypeDef *i2c, uint8_t deviceAddr){
 	//Передаем адрес. ADDR(Address sent (master mode)/matched (slave mode)) — в режиме master
 	//устанавливается после передачи адреса, в режиме slave устанавливается при
 	//совпадении адреса. Для сброса нужно прочитать регистр SR1, а затем SR2.
-	i2c->DR = deviceAddr;				//Передаем адрес.
-	_i2c_LongWait(i2c, I2C_SR1_ADDR);	//ждем пердачу адреса и установку ADDR
-	(void)i2c->SR1;						//сбрасываем бит ADDR (чтением SR1 и SR2):
+	i2c->DR = deviceAddr;					 //Передаем адрес.
+	_i2c_WaitClearFlagSR1(i2c, I2C_SR1_ADDR);//ждем пердачу адреса и установку ADDR
+	(void)i2c->SR1;							 //сбрасываем бит ADDR (чтением SR1 и SR2):
 	(void)i2c->SR2;
 
 	//Если получили NAC то выходим
@@ -192,7 +192,7 @@ I2C_State_t I2C_ReadData(I2C_TypeDef *i2c, uint8_t *pBuf, uint32_t len){
 	{
 		i2c->CR1 &= ~I2C_CR1_ACK;			//ACK = 0  - Фомирование NACK.
 		i2c->CR1 |= I2C_CR1_STOP;			//STOP = 1 - Формируем Stop.
-		_i2c_LongWait(i2c, I2C_SR1_RXNE);	//Wait until RXNE = 1
+		_i2c_WaitClearFlagSR1(i2c, I2C_SR1_RXNE);	//Wait until RXNE = 1
 		*(pBuf + 0) = i2c->DR;				//Read the data
 		//while(i2c->CR1 & I2C_CR1_STOP);	//Wait until STOP is cleared by hardware
 		_i2c_ClearFlagCR1(i2c, I2C_CR1_STOP);//Wait until STOP is cleared by hardware
@@ -203,7 +203,7 @@ I2C_State_t I2C_ReadData(I2C_TypeDef *i2c, uint8_t *pBuf, uint32_t len){
 	{
 		i2c->CR1 |=  I2C_CR1_POS;			//POS = 1
 		i2c->CR1 &= ~I2C_CR1_ACK;			//ACK = 0 - Фомирование NACK.
-		_i2c_LongWait(i2c, I2C_SR1_BTF);	//Wait for BTF = 1
+		_i2c_WaitClearFlagSR1(i2c, I2C_SR1_BTF);	//Wait for BTF = 1
 		i2c->CR1 |= I2C_CR1_STOP;			//STOP = 1 - Формируем Stop.
 		*(pBuf + 0) = i2c->DR;	 			//Read Data1.
 		*(pBuf + 1) = i2c->DR;	 			//Read Data2.
@@ -218,15 +218,15 @@ I2C_State_t I2C_ReadData(I2C_TypeDef *i2c, uint8_t *pBuf, uint32_t len){
 		uint32_t i;
 		for(i=0; i < (len-2); i++)
 		{
-			_i2c_LongWait(i2c, I2C_SR1_RXNE);//Wait for RXNE = 1
-			*(pBuf + i) = i2c->DR;			 //Read Data
+			_i2c_WaitClearFlagSR1(i2c, I2C_SR1_RXNE);//Wait for RXNE = 1
+			*(pBuf + i) = i2c->DR;			 		//Read Data
 		}
 		//Вычитываем оставшиеся 2 байта.
-		_i2c_LongWait(i2c, I2C_SR1_BTF);	//Wait for BTF = 1
+		_i2c_WaitClearFlagSR1(i2c, I2C_SR1_BTF);	//Wait for BTF = 1
 		i2c->CR1 &= ~I2C_CR1_ACK; 			//ACK  = 0 - Фомирование NACK
 		i2c->CR1 |= I2C_CR1_STOP; 			//STOP = 1 - Формируем Stop
 		*(pBuf + i + 0) = i2c->DR;			//Read DataN-1
-		_i2c_LongWait(i2c, I2C_SR1_RXNE);	//Wait for RXNE = 1
+		_i2c_WaitClearFlagSR1(i2c, I2C_SR1_RXNE);	//Wait for RXNE = 1
 		*(pBuf + i + 1) = i2c->DR;			//Read DataN
 		//while(i2c->CR1 & I2C_CR1_STOP);	//Wait until STOP is cleared by hardware
 		_i2c_ClearFlagCR1(i2c, I2C_CR1_STOP);//Wait until STOP is cleared by hardware
@@ -238,7 +238,7 @@ I2C_State_t I2C_ReadData(I2C_TypeDef *i2c, uint8_t *pBuf, uint32_t len){
 //Передача одного байта.
 I2C_State_t I2C_SendByte(I2C_TypeDef *i2c, uint8_t byte){
 
-	_i2c_LongWait(i2c, I2C_SR1_TXE);	//Ждем освобождения регистра DR
+	_i2c_WaitClearFlagSR1(i2c, I2C_SR1_TXE);//Ждем освобождения регистра DR
 	i2c->DR = byte;
 	return I2C_OK;
 }
@@ -248,11 +248,11 @@ I2C_State_t I2C_SendDataWithStop(I2C_TypeDef *i2c, uint8_t *pBuf, uint32_t len){
 
 	for(uint32_t i = 0; i < len; i++)
 	{
-		_i2c_LongWait(i2c, I2C_SR1_TXE);//Ждем освобождения регистра DR
-		i2c->DR = *(pBuf + i);			//передаем байт
+		_i2c_WaitClearFlagSR1(i2c, I2C_SR1_TXE);//Ждем освобождения регистра DR
+		i2c->DR = *(pBuf + i);					//передаем байт
 	}
-	_i2c_LongWait(i2c, I2C_SR1_BTF);	//ждем окончания передачи байта
-	I2C_Stop(i2c);	 					//Формируем Stop
+	_i2c_WaitClearFlagSR1(i2c, I2C_SR1_BTF);//ждем окончания передачи байта
+	I2C_Stop(i2c);	 						//Формируем Stop
 	return I2C_OK;
 }
 //**********************************************************
@@ -261,10 +261,11 @@ I2C_State_t I2C_SendDataWithoutStop(I2C_TypeDef *i2c, uint8_t *pBuf, uint32_t le
 
 	for(uint32_t i = 0; i < len; i++)
 	{
-		_i2c_LongWait(i2c, I2C_SR1_TXE);//Ждем освобождения регистра DR
-		i2c->DR = *(pBuf + i);			//передаем байт
+		_i2c_WaitClearFlagSR1(i2c, I2C_SR1_TXE);//Ждем освобождения регистра DR
+		i2c->DR = *(pBuf + i);					//передаем байт
 	}
 	//if(_i2c_LongWait(i2c, I2C_SR1_BTF)) return I2C_ERR_BTF;
+	//_i2c_WaitClearFlagSR1(i2c, I2C_SR1_BTF);//ждем окончания передачи байта
 	return I2C_OK;
 }
 //*******************************************************************************************
@@ -311,10 +312,7 @@ I2C_State_t I2C_Master_Write(I2C_TypeDef *i2c, uint8_t deviceAddr, uint8_t regAd
 	if(I2C_StartAndSendDeviceAddr(i2c, deviceAddr|I2C_WRITE) != I2C_OK) return I2C_ERR_NAC;
 
 	//Передача адреса в который хотим записать.
-	//i2c->DR = regAddr;
-	//if(_i2c_LongWait(i2c, I2C_SR1_TXE)) return I2C_ERR_TX_BYTE;
 	I2C_SendByte(i2c, regAddr);
-	_i2c_LongWait(i2c, I2C_SR1_TXE);	//Ждем освобождения регистра DR
 
 	//передача данных на запись.
 	return(I2C_SendDataWithStop(i2c, pBuf, len));
@@ -336,10 +334,8 @@ I2C_State_t I2C_Master_Read(I2C_TypeDef *i2c, uint8_t deviceAddr, uint8_t regAdd
 	if(I2C_StartAndSendDeviceAddr(i2c, deviceAddr|I2C_WRITE) != I2C_OK) return I2C_ERR_NAC;
 
 	//Передача адреса с которого начинаем чтение.
-	//i2c->DR = regAddr;
-	//if(_i2c_LongWait(i2c, I2C_SR1_TXE)) return I2C_ERR_TX_BYTE;
 	I2C_SendByte(i2c, regAddr);
-	_i2c_LongWait(i2c, I2C_SR1_TXE);	//Ждем освобождения регистра DR
+	_i2c_WaitClearFlagSR1(i2c, I2C_SR1_TXE); //Ждем освобождения регистра DR
 
 	//Формирование reStart condition.
 	//i2c->CR1 |= I2C_CR1_STOP; //Это команда нужна для работы с DS2782. Без нее не работает
@@ -435,19 +431,28 @@ void I2C_IT_DeInit(I2C_IT_t *i2cIt){
 	i2cIt->state = I2C_IT_STATE_RESET;
 }
 //**********************************************************
+//Указатель на рабочий буфер приема/передачи
 void I2C_IT_SetpBuf(I2C_IT_t *i2cIt, uint8_t *pBuf){
 
 	i2cIt->pBuf = pBuf;
 }
 //**********************************************************
+//Размер данных на прием/передачу
 void I2C_IT_SetDataSize(I2C_IT_t *i2cIt, uint32_t size){
 
 	i2cIt->bufSize = size;
 }
 //**********************************************************
+//Счетчик принятых/переданных байтов.
 uint32_t I2C_IT_GetDataCount(I2C_IT_t *i2cIt){
 
 	return i2cIt->bufCount;
+}
+//**********************************************************
+//Состояние I2C (работа по прерываниям)
+I2C_IT_State_t I2C_IT_GetState(I2C_IT_t *i2cIt){
+
+	return i2cIt->state;
 }
 //*******************************************************************************************
 //*******************************************************************************************
@@ -709,7 +714,7 @@ static void I2C_IT_Error(I2C_IT_t *i2cIt){
 	if(i2c->SR1 & I2C_SR1_AF)
 	{
 		//_i2c_ClearFlag(i2c, I2C_SR1_AF);	//Сброс флага ошибки.
-		i2c->SR1 &= ~I2C_SR1_AF;			//
+		i2c->SR1 &= ~I2C_SR1_AF;			//Сброс флага ошибки.
 		i2c->CR1 |= I2C_CR1_ACK;			//разрешаем генерацию NACK
 		i2cIt->state = I2C_IT_STATE_NAC;	//от Мастера принят NACK -признак завершения чтения байтов.
 		I2C_IT_SlaveTxCpltCallback(i2cIt);	//Что нибудь делаем по окончению передачи данных.
